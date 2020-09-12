@@ -76,7 +76,6 @@ namespace CharaSelect
         {
             foreach (var instruction in instructions)
             {
-                UnityEngine.Debug.Log(instruction.ToString());
                 if (instruction.ToString().Equals("ldfld System.Collections.Generic.List`1[GameLoadCharaFileSystem.GameCharaFileInfo] charaLists"))
                 {
                     yield return instruction;
@@ -269,6 +268,35 @@ namespace CharaSelect
             {
                 __result = __instance.LoadCharaFile(fileStream, noLoadPng, noLoadStatus);
             }
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(AIChara.ChaFileControl))]
+    [HarmonyPatch("ConvertCharaFilePath")]
+    class PatchConvertCharaFilePath
+    {
+        static bool Prefix(ref string __result, AIChara.ChaFileControl __instance, string path, byte _sex, bool newFile = false)
+        {
+            /* We need a new path. */
+            if (newFile || __instance.charaFileName == "")
+            {
+                return true;
+            }
+            /* Looks like a real path, ensure the extension exists. */
+            if (path.IndexOf(UserData.Path) >= 0)
+            {
+                Logger.Log($"Looks like a real path: {path} ");
+                var noExt = Path.ChangeExtension(path, null);
+                __result = noExt + ".png";
+                return false;
+            }
+
+            /* Looks like a relative path, reconstruct it and return. */
+            byte sexByte = (byte.MaxValue == _sex) ? __instance.parameter.sex : _sex;
+            var absPath = Helpers.ConstructPath(path, sexByte);
+            __result = absPath;
+            Logger.Log($"Running convert chara file path on {path} --> {absPath}");
             return false;
         }
     }
