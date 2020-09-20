@@ -15,28 +15,52 @@ namespace CharaSelect
 
     class Helpers
     {
+        public static String[] possibleRoots =
+        {
+            "chara/female/",
+            "chara/male/",
+            "chara/navi/",
+            "coordinate/female/",
+            "coordinate/male/",
+            "cardframe/Back/",
+            "cardframe/Front/",
+            "bg/"
+        };
+
+        public static bool IsFullPath(string path)
+        {
+            if (path.IndexOf(UserData.Path) >= 0)
+            {
+                return true;
+            }
+            var thePath = path.Replace("\\", "/");
+
+            foreach (var p in Helpers.possibleRoots)
+            {
+                if (thePath.IndexOf(p) > 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public static string ConstructPath(string name, byte sex)
         {
-            bool male = sex == 255;
-            return UserData.Path + (male ? "chara/male/" : "chara/female/") + name + ".png";
+            bool male = (sex == 0);
+            string path = UserData.Path + (male ? "chara/male/" : "chara/female/") + name;
+            path  = Path.ChangeExtension(path, null);
+            return path + ".png";
         }
 
         public static string PathFromRoot(string path)
         {
-            String[] possibleRoots = {
-                "chara/female/",
-                "chara/male/",
-                "chara/navi/",
-                "coordinate/female/",
-                "coordinate/male/",
-                "cardframe/Back/",
-                "cardframe/Front/",
-                "/bg/"};
 
             path = path.Replace("\\", "/");
             String relpath = path;
             bool found = false;
-            foreach (var p in possibleRoots)
+            foreach (var p in Helpers.possibleRoots)
             {
                 int idx = path.IndexOf(p);
                 if (idx > 0)
@@ -59,6 +83,7 @@ namespace CharaSelect
 
     [HarmonyPatch(typeof(HS2.GroupCharaSelectUI))]
     [HarmonyPatch("ReDrawListView")]
+    /* Filter the character list by the current directory of the attached component. */
     class PatchCharaRedraw
     {
         public static List<GameLoadCharaFileSystem.GameCharaFileInfo> Injected(List<GameLoadCharaFileSystem.GameCharaFileInfo> list, HS2.GroupCharaSelectUI instance)
@@ -71,7 +96,6 @@ namespace CharaSelect
             return list.FindAll(info => Directory.GetParent(info.FullPath).FullName.Equals(ui.currentDir));
         }
 
-        /* Filter the character list by the current directory of the attached component. */
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             foreach (var instruction in instructions)
@@ -92,6 +116,7 @@ namespace CharaSelect
 
     [HarmonyPatch(typeof(HS2.GroupCharaSelectUI))]
     [HarmonyPatch("Start")]
+    /* Patch the UI to add subfolder support. */
     class PatchCharaSelectUI
     {
         static void Postfix(HS2.GroupCharaSelectUI __instance)
@@ -132,9 +157,9 @@ namespace CharaSelect
 
     [HarmonyPatch(typeof(SaveData))]
     [HarmonyPatch("IsRoomListChara")]
+    /* Remove the call to GetFileNameWithoutExtension, to integrate with the full path. */
     class PatchSaveDataFind
     {
-        /* Remove the call to GetFileNameWithoutExtension, to integrate with the full path. */
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             foreach (var instruction in instructions)
@@ -153,22 +178,16 @@ namespace CharaSelect
 
     [HarmonyPatch(typeof(Manager.LobbySceneManager))]
     [HarmonyPatch("LoadChara")]
+    /* Replace the naive filename with a query from the root path. */
     class PatchLobbyLoad
     {
-
-        public static String Injected(String file)
-        {
-            return Helpers.PathFromRoot(file);
-        }
-
-        /* Replace the naive filename with a query from the root path. */
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             foreach (var instruction in instructions)
             {
                 if (instruction.ToString().Equals("call System.String System.IO.Path::GetFileNameWithoutExtension(System.String)"))
                 {
-                    yield return new CodeInstruction(OpCodes.Call, typeof(PatchLobbyLoad).GetMethod(nameof(Injected), BindingFlags.Public | BindingFlags.Static));
+                    yield return new CodeInstruction(OpCodes.Call, typeof(Helpers).GetMethod(nameof(Helpers.PathFromRoot), BindingFlags.Public | BindingFlags.Static));
                 }
                 else
                 {
@@ -178,6 +197,7 @@ namespace CharaSelect
         }
     }
 
+    // FIXME need to convert to patch
     [HarmonyPatch(typeof(FolderAssist))]
     [HarmonyPatch("CreateFolderInfoExToArray")]
     class PatchCharaFinder
@@ -203,6 +223,7 @@ namespace CharaSelect
         }
     }
 
+    // FIXME need to convert to patch
     [HarmonyPatch(typeof(FolderAssist))]
     [HarmonyPatch("CreateFolderInfoToArray")]
     class PatchCharaFinder2
@@ -229,6 +250,29 @@ namespace CharaSelect
     }
 
     [HarmonyPatch(typeof(AIChara.ChaFileControl))]
+    [HarmonyPatch("SaveCharaFile")]
+    [HarmonyPatch(new Type[] { typeof(string), typeof(byte), typeof(bool) })]
+    /* SaveCharaFile sets charaFileName to the file name without the relative path. Inject to retain the relative path. */
+    class PatchSaveCharaFile
+    {
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        {
+            foreach (var instruction in instructions)
+            {
+                if (instruction.ToString().Equals("call System.String System.IO.Path::GetFileName(System.String)"))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, typeof(Helpers).GetMethod(nameof(Helpers.PathFromRoot), BindingFlags.Public | BindingFlags.Static));
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+    }
+
+    // FIXME need to convert to patch
+    [HarmonyPatch(typeof(AIChara.ChaFileControl))]
     [HarmonyPatch("LoadCharaFile")]
     [HarmonyPatch(new Type[] { typeof(string), typeof(byte), typeof(bool), typeof(bool) })]
     class PatchLoadCharaFile
@@ -241,6 +285,7 @@ namespace CharaSelect
                 return false;
             }
 
+
             // CHANGED THIS -- use filename for the charaFileName ? does this do anything? 
             /**
              * 	base.charaFileName = Path.GetFileName(filename);
@@ -248,16 +293,20 @@ namespace CharaSelect
 	    	 *  if (!File.Exists(path))
              * */
 
+
             /* Attempt to find the path directly. */
             String charapath = filename;
             if (!File.Exists(charapath))
             {
-                charapath = Helpers.ConstructPath(filename, sex);
+                byte sexByte = (sex == byte.MaxValue) ? __instance.parameter.sex : sex;
+                charapath = Helpers.ConstructPath(filename, sexByte);
             }
 
 
             String charaName = Helpers.PathFromRoot(charapath);
             __instance.GetType().BaseType.InvokeMember("charaFileName", BindingFlags.SetProperty, null, __instance, new object[] { charaName });
+
+
             if (!File.Exists(charapath))
             {
                 Logger.Log($"Couldn't find file : {charapath}");
@@ -272,6 +321,7 @@ namespace CharaSelect
         }
     }
 
+
     [HarmonyPatch(typeof(AIChara.ChaFileControl))]
     [HarmonyPatch("ConvertCharaFilePath")]
     class PatchConvertCharaFilePath
@@ -284,7 +334,7 @@ namespace CharaSelect
                 return true;
             }
             /* Looks like a real path, ensure the extension exists. */
-            if (path.IndexOf(UserData.Path) >= 0)
+            if (Helpers.IsFullPath(path))
             {
                 Logger.Log($"Looks like a real path: {path} ");
                 var noExt = Path.ChangeExtension(path, null);
@@ -296,7 +346,7 @@ namespace CharaSelect
             byte sexByte = (byte.MaxValue == _sex) ? __instance.parameter.sex : _sex;
             var absPath = Helpers.ConstructPath(path, sexByte);
             __result = absPath;
-            Logger.Log($"Running convert chara file path on {path} --> {absPath}");
+            //Logger.Log($"Running convert chara file path on {path} --> {absPath}");
             return false;
         }
     }
@@ -394,3 +444,4 @@ namespace CharaSelect
     //    }
 
 }
+
