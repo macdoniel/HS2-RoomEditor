@@ -81,6 +81,7 @@
   <ItemGroup>
     <Compile Include="CharaSelectPlugin.cs" />
     <Compile Include="CharaFolderUI.cs" />
+    <Compile Include="HSceneFolderUI.cs" />
     <Compile Include="Patches.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

@@ -10,6 +10,8 @@ using UnityEngine;
 using Object = UnityEngine.Object;
 using Logger = UnityEngine.Debug;
 
+using Instructions = System.Collections.Generic.IEnumerable<HarmonyLib.CodeInstruction>;
+
 namespace CharaSelect
 {
 
@@ -79,7 +81,178 @@ namespace CharaSelect
             relpath = Path.ChangeExtension(relpath, null);
             return relpath;
         }
+
+        public static Instructions findInstruction(Instructions instructions, string inst, Func<CodeInstruction,Instructions> callback)
+        {
+            foreach (var instruction in instructions)
+            {
+                if (instruction.ToString().StartsWith(inst))
+                {
+                    var res = callback.Invoke(instruction);
+                    foreach (var r in res)
+                    {
+                        yield return r;
+                    }
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+
+        }
+
+
+        public class UI
+        {
+            private static void MoveRight(RectTransform t, float delta)
+            {
+                var offMin = t.offsetMin;
+                var offMax = t.offsetMax;
+                t.offsetMin = new Vector2(offMin.x + delta, offMin.y);
+                t.offsetMax = new Vector2(offMax.x + delta, offMax.y);
+            }
+
+            public static void ModifyHSceneMenu(HSceneFolderUI plugin, HSceneSpriteCoordinatesCard menu)
+            {
+                UnityEngine.Debug.Log($"Postfix constructor patch\n\n\n");
+                var bgPanel = menu.transform.Find("CardImageBG");
+                var coordPanel = menu.transform.Find("CoodenatePanel");
+                var newCoordPanel = menu.transform.Find("CoodenatePanel(Clone)");
+                Transform contentPanel = null;
+                if (newCoordPanel == null)
+                {
+                    newCoordPanel = Object.Instantiate(coordPanel, menu.transform, false);
+                    var bgT = bgPanel.GetComponent<RectTransform>();
+                    var coordT = coordPanel.GetComponent<RectTransform>();
+                    var delta = coordT.sizeDelta;
+                    MoveRight(bgT, delta.x);
+                    MoveRight(coordT, delta.x);
+
+                    /** Disable some elements. **/
+                    newCoordPanel.Find("SortDate").gameObject.SetActive(false);
+                    newCoordPanel.Find("SortName").gameObject.SetActive(false);
+                    newCoordPanel.Find("Sort Up").gameObject.SetActive(false);
+                    newCoordPanel.Find("Sort Down").gameObject.SetActive(false);
+                    newCoordPanel.Find("DecideCoode").gameObject.SetActive(false);
+                    contentPanel = newCoordPanel.Find("Scroll View/Viewport/Content");
+                }
+                else
+                {
+                    contentPanel = newCoordPanel.Find("Scroll View/Viewport/Content");
+                    foreach (Transform t in contentPanel)
+                    {
+                        t.gameObject.SetActive(false);
+                    }
+                }
+
+                var btn = coordPanel.Find("DecideCoode");
+                var content = newCoordPanel.Find("Scroll View/Viewport/Content");
+                var newBtn = Object.Instantiate(btn, content.transform, false);
+                newBtn.GetComponent<RectTransform>().sizeDelta = new Vector2(190f, 30f);
+                newBtn.gameObject.SetActive(false);
+                plugin.btnProto = newBtn.gameObject;
+                plugin.contentPane = contentPanel;
+                plugin.activated = true;
+                Logger.Log("Finished post constructor patch");
+            }
+
+            public static void ModifyGameMenu(MonoBehaviour menu, string rootPath, Action action)
+            {
+
+                UnityEngine.Debug.Log($"Postfix constructor patch\n\n\n");
+                var panel = menu.transform.Find("Panel");
+                var sep = panel.transform.Find("imgSeparate (1)");
+                var sepClone = Object.Instantiate(sep, panel.transform);
+                var view = panel.Find("View");
+                var scrollView = view.Find("Scroll View");
+                var delta = scrollView.GetComponent<RectTransform>().sizeDelta;
+                var viewCopy = Object.Instantiate(view, panel.transform);
+                var folderScroll = viewCopy.Find("Scroll View");
+                var folderContent = folderScroll.Find("Viewport/Content");
+                folderContent.Find("Raw").gameObject.SetActive(false);
+
+                var possibleBtns = new string[] { "Buttons/btnEntry", "Buttons/btnBatchRelease" };
+
+                Transform btn = null;
+
+                foreach (var pbtn in possibleBtns)
+                {
+                    var b = panel.Find(pbtn);
+                    if (b != null)
+                    {
+                        btn = b;
+                        break;
+                    }
+                }
+
+                var menuHeight = CharaSelectPlugin.MenuHeight.Value;
+                var padding = 10;
+
+                viewCopy.SetSiblingIndex(2);
+                sepClone.SetSiblingIndex(3);
+                folderScroll.GetComponent<RectTransform>().sizeDelta = new Vector2(delta.x, menuHeight - padding);
+                folderScroll.GetComponent<UnityEngine.UI.ScrollRect>().scrollSensitivity = 15;
+
+
+                sepClone.transform.Translate(0, delta.y - menuHeight, 0);
+
+                view.transform.Translate(0, -menuHeight - 2 * padding, 0);
+
+                scrollView.GetComponent<RectTransform>().sizeDelta = new Vector2(delta.x, delta.y - menuHeight - 2 * padding);
+
+                var plugin = menu.gameObject.AddComponent<CharaFolderUI>();
+                plugin.Initialize(menu, folderContent.gameObject, btn.gameObject, rootPath, action);
+                Logger.Log("Finished post constructor patch");
+            }
+        }
+
+
+        public class Patches
+        {
+            public static List<CoordinateFileSystem.CoordinateFileInfo> CoordList(List<CoordinateFileSystem.CoordinateFileInfo> list, HS2.CoordinateListUI instance)
+            {
+                CharaFolderUI ui = instance.GetComponent<CharaFolderUI>();
+                if (ui == null)
+                {
+                    return list;
+                }
+                return list.FindAll(info => Directory.GetParent(info.FullPath).FullName.Equals(ui.currentDir));
+            }
+
+            public static Func<CodeInstruction, Instructions> CoordCallback = (instruction) =>
+            {
+                return new List<CodeInstruction>
+                {
+                    new CodeInstruction(OpCodes.Ldarg_0),
+                    new CodeInstruction(OpCodes.Call, typeof(Patches).GetMethod(nameof(CoordList), BindingFlags.Public | BindingFlags.Static)),
+                    instruction
+                };
+            };
+        }
     }
+
+
+    class PatchHSceneCoords
+    {
+
+        [HarmonyPostfix, HarmonyPatch(typeof(HSceneSpriteCoordinatesCard), "Start")]
+        public static void Start(HSceneSpriteCoordinatesCard __instance)
+        {
+            var plugin = __instance.gameObject.GetOrAddComponent<HSceneFolderUI>();
+            plugin.Initialize(__instance);
+        }
+
+        [HarmonyPostfix, HarmonyPatch(typeof(HSceneSpriteCoordinatesCard), "ChangeTargetSex")]
+        public static void Postfix(HSceneSpriteCoordinatesCard __instance, int sex)
+        {
+            Logger.Log("Changing target sex!!!");
+            var plugin = __instance.gameObject.GetOrAddComponent<HSceneFolderUI>();
+            plugin.DeriveRootDir();
+            plugin.FilterCoords(); 
+        }
+    }
+
 
     [HarmonyPatch(typeof(HS2.GroupCharaSelectUI))]
     [HarmonyPatch("ReDrawListView")]
@@ -96,23 +269,54 @@ namespace CharaSelect
             return list.FindAll(info => Directory.GetParent(info.FullPath).FullName.Equals(ui.currentDir));
         }
 
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        static Instructions Transpiler(Instructions instructions)
         {
-            foreach (var instruction in instructions)
+            var i = "ldfld System.Collections.Generic.List`1[GameLoadCharaFileSystem.GameCharaFileInfo] charaLists";
+            return Helpers.findInstruction(instructions, i, (inst) =>
             {
-                if (instruction.ToString().Equals("ldfld System.Collections.Generic.List`1[GameLoadCharaFileSystem.GameCharaFileInfo] charaLists"))
+                return new List<CodeInstruction>
                 {
-                    yield return instruction;
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Call, typeof(PatchCharaRedraw).GetMethod(nameof(Injected), BindingFlags.Public | BindingFlags.Static));
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
+                    inst,
+                    new CodeInstruction(OpCodes.Ldarg_0),
+                    new CodeInstruction(OpCodes.Call, typeof(PatchCharaRedraw).GetMethod(nameof(Injected), BindingFlags.Public | BindingFlags.Static))
+                };
+            });
         }
     }
+
+    class PatchCoordinateListUI
+    {
+        [HarmonyTranspiler, HarmonyPatch(typeof(HS2.CoordinateListUI), "InitListSelect")]
+        static Instructions InitListSelect(Instructions instructions)
+        {
+            var i = "callvirt System.Void CoordinateFileSystem.CoordinateFileScrollController::Init";
+            return Helpers.findInstruction(instructions, i, Helpers.Patches.CoordCallback);
+        }
+
+        [HarmonyTranspiler, HarmonyPatch(typeof(HS2.CoordinateListUI), "ListSelectRelease")]
+        static Instructions ListSelectRelease(Instructions instructions)
+        {
+            var i = "callvirt System.Void CoordinateFileSystem.CoordinateFileScrollController::Init";
+            return Helpers.findInstruction(instructions, i, Helpers.Patches.CoordCallback);
+        }
+
+        [HarmonyTranspiler, HarmonyPatch(typeof(HS2.CoordinateListUI), "ReDrawListView")]
+        static Instructions ReDrawListView(Instructions instructions)
+        {
+            var i = "callvirt System.Void CoordinateFileSystem.CoordinateFileScrollController::Init";
+            return Helpers.findInstruction(instructions, i, Helpers.Patches.CoordCallback);
+        }
+
+        [HarmonyPostfix, HarmonyPatch(typeof(HS2.CoordinateListUI), "Start")]
+        static void Start(HS2.CoordinateListUI __instance)
+        {
+            Helpers.UI.ModifyGameMenu(__instance, "coordinate/female", () => 
+            {
+                __instance.ReDrawListView();
+            });
+        }
+    }
+
 
     [HarmonyPatch(typeof(HS2.GroupCharaSelectUI))]
     [HarmonyPatch("Start")]
@@ -121,37 +325,10 @@ namespace CharaSelect
     {
         static void Postfix(HS2.GroupCharaSelectUI __instance)
         {
-            UnityEngine.Debug.Log($"Postfix constructor patch\n\n\n");
-            var panel = __instance.transform.Find("Panel");
-            var sep = panel.transform.Find("imgSeparate (1)");
-            var sepClone = Object.Instantiate(sep, panel.transform);
-            var view = panel.Find("View");
-            var scrollView = view.Find("Scroll View");
-            var delta = scrollView.GetComponent<RectTransform>().sizeDelta;
-            var viewCopy = Object.Instantiate(view, panel.transform);
-            var folderScroll = viewCopy.Find("Scroll View");
-            var folderContent = folderScroll.Find("Viewport/Content");
-            folderContent.Find("Raw").gameObject.SetActive(false);
-            var btn = panel.Find("Buttons/btnEntry");
-
-            var menuHeight = CharaSelectPlugin.MenuHeight.Value;
-            var padding = 10;
-
-            viewCopy.SetSiblingIndex(2);
-            sepClone.SetSiblingIndex(3);
-            folderScroll.GetComponent<RectTransform>().sizeDelta = new Vector2(delta.x, menuHeight - padding);
-            folderScroll.GetComponent<UnityEngine.UI.ScrollRect>().scrollSensitivity = 15;
-
-
-            sepClone.transform.Translate(0, delta.y - menuHeight, 0);
-
-            view.transform.Translate(0, -menuHeight - 2*padding, 0);
-
-            scrollView.GetComponent<RectTransform>().sizeDelta = new Vector2(delta.x, delta.y - menuHeight - 2*padding);
-
-            var plugin = __instance.gameObject.AddComponent<CharaFolderUI>();
-            plugin.Initialize(__instance, folderContent.gameObject, btn.gameObject, "chara/female");
-            Logger.Log("Finished post constructor patch");
+            Helpers.UI.ModifyGameMenu(__instance, "chara/female", () =>
+            {
+                __instance.ReDrawListView();
+            });
         }
     }
 
@@ -197,7 +374,6 @@ namespace CharaSelect
         }
     }
 
-    // FIXME need to convert to patch
     [HarmonyPatch(typeof(FolderAssist))]
     [HarmonyPatch("CreateFolderInfoExToArray")]
     class PatchCharaFinder
@@ -209,21 +385,20 @@ namespace CharaSelect
                 __result = null;
                 return false;
             }
-            // CHANGED THIS -- add alldirs
+            /** Changed to return files in subdirectories **/
             string[] source = searchPattern.SelectMany((string pattern) => Directory.GetFiles(folder, pattern, SearchOption.AllDirectories)).ToArray<string>();
             if (!source.Any<string>())
             {
                 __result = null;
                 return false;
             }
+            /** Changed to use relative path **/
             __result = (from path in source
-                            // CHANGED THIS -- pathfrom root
                         select new FolderAssist.FileInfo(path, Helpers.PathFromRoot(path), new DateTime?(File.GetLastWriteTime(path)))).ToArray<FolderAssist.FileInfo>();
             return false;
         }
     }
 
-    // FIXME need to convert to patch
     [HarmonyPatch(typeof(FolderAssist))]
     [HarmonyPatch("CreateFolderInfoToArray")]
     class PatchCharaFinder2
@@ -235,15 +410,15 @@ namespace CharaSelect
                 __result = null;
                 return false;
             }
-            // CHANGED THIS -- add alldirs
+            /** Changed to return files in subdirectories **/
             string[] source = getFiles ? Directory.GetFiles(folder, searchPattern, SearchOption.AllDirectories) : Directory.GetDirectories(folder);
             if (!source.Any<string>())
             {
                 __result = null;
                 return false;
             }
+            /** Changed to use relative path **/
             __result = (from path in source
-                            // CHANGED THIS -- pathfrom root
                         select new FolderAssist.FileInfo(path, (!getFiles) ? string.Empty : Helpers.PathFromRoot(path), new DateTime?(File.GetLastWriteTime(path)))).ToArray<FolderAssist.FileInfo>();
             return false;
         }

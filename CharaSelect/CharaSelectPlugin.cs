@@ -28,9 +28,11 @@ namespace CharaSelect
             ButtonHeight = Config.Bind("Appearance", "Button height", 30);
             Columns = Config.Bind("Appearance", "Columns", 2);
 
-
             var harmony = new Harmony("org.macdoniel.charaselect");
             harmony.PatchAll();
+
+            harmony.PatchAll(typeof(CharaSelect.PatchCoordinateListUI));
+            harmony.PatchAll(typeof(CharaSelect.PatchHSceneCoords));
         }
     }
 }

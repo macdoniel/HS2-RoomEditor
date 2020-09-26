@@ -10,7 +10,7 @@ namespace CharaSelect
 {
     class CharaFolderUI : MonoBehaviour
     {
-        HS2.GroupCharaSelectUI parent;
+        MonoBehaviour parent;
         GameObject contentPane;
         GameObject prefab;
 
@@ -19,9 +19,11 @@ namespace CharaSelect
         public String currentDir;
 
         const int PADDING = 5;
+        public Action action;
 
-        public void Initialize(HS2.GroupCharaSelectUI parent, GameObject contentPane, GameObject btnPrefab, String rootPath)
+        public void Initialize(MonoBehaviour parent, GameObject contentPane, GameObject btnPrefab, String rootPath, Action action)
         {
+            this.action = action;
             this.parent = parent;
             this.contentPane = contentPane;
             this.prefab = btnPrefab;
@@ -94,7 +96,6 @@ namespace CharaSelect
             {
                 if (c.GetComponent<UnityEngine.UI.Button>() != null)
                 {
-                    UnityEngine.Debug.Log("deleting");
                     c.gameObject.SetActive(false);
                     Destroy(c.gameObject);
                 }
@@ -109,7 +110,7 @@ namespace CharaSelect
                 list.Insert(0, new { name = "../", directory = Directory.GetParent(dir).FullName });
             }
 
-            parent.ReDrawListView();
+            action.Invoke();
 
             list.Select((s, i) => new { s.name, s.directory, index = i })
                 .ToList()
