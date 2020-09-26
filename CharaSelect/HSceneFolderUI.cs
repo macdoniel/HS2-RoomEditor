@@ -54,10 +54,10 @@ namespace CharaSelect
         public void DeriveRootDir()
         {
             String[] possibleRoots = {
-            "chara/female/",
-            "chara/male/",
-            "coordinate/female/",
-            "coordinate/male/",
+            "chara/female",
+            "chara/male",
+            "coordinate/female",
+            "coordinate/male",
             };
 
 
@@ -103,7 +103,7 @@ namespace CharaSelect
                                 .Select(d => new { name = Path.GetFileNameWithoutExtension(d), directory = d})
                                 .ToList();
 
-            if (!dir.Equals(this._rootDir))
+            if (!dir.Replace("\\","/").Equals(this._rootDir.Replace("\\","/")))
             {
                 Logger.Log(dir);
                 Logger.Log(this._rootDir);
@@ -115,6 +115,7 @@ namespace CharaSelect
 
             FilterCoords();
         }
+
 
         private void CreateButton(String name, String dir, int index)
         {
@@ -148,7 +149,7 @@ namespace CharaSelect
             var newList = lstCoordinates.Where((node) =>
             {
                 Logger.Log($"coordinate : {node.fileName}");
-                return currentFiles.Any((s) => s.Equals(node.fileName));
+                return currentFiles.Any((s) => s.Replace("\\","/").Equals(node.fileName.Replace("\\","/") ));
             }).ToList();
 
             foreach (var c in lstCoordinates)
