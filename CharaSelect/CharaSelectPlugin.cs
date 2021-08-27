@@ -31,8 +31,10 @@ namespace CharaSelect
             var harmony = new Harmony("org.macdoniel.charaselect");
             harmony.PatchAll();
 
-            harmony.PatchAll(typeof(CharaSelect.PatchCoordinateListUI));
-            harmony.PatchAll(typeof(CharaSelect.PatchHSceneCoords));
+            harmony.PatchAll(typeof(CharaSelect.PatchListUI));
+
+            // harmony.PatchAll(typeof(CharaSelect.PatchCoordinateListUI));
+            // harmony.PatchAll(typeof(CharaSelect.PatchHSceneCoords));
         }
     }
 }

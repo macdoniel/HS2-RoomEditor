@@ -2,6 +2,6 @@
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
     <StartAction>Program</StartAction>
-    <StartProgram>H:\HoneySelect2\InitSetting.exe</StartProgram>
+    <StartProgram>"N:\Honey Select 2\InitSetting.exe"</StartProgram>
   </PropertyGroup>
 </Project>
