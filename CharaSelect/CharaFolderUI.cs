@@ -45,7 +45,7 @@ namespace CharaSelect
             {
                 this.clothesSave = controller;
                 Logger.Log("CharaSelect :: In save controller, adding button!");
-                StartCoroutine("CreateSaveButton");
+                StartCoroutine(nameof(CreateSaveButton));
             }
         }
 
@@ -108,6 +108,7 @@ namespace CharaSelect
             var theText = text.GetComponent<UnityEngine.UI.Text>();
 
             theText.text = name;
+            theText.fontSize = 14;
             theText.color = Color.white;
             btnFolder.transform.localPosition = new Vector2( (this.width/columns)*x, (-(buttonHeight + PADDING) * y) - (buttonHeight + PADDING)/2);
             btnFolder.GetComponent<RectTransform>().sizeDelta = new Vector2(w, buttonHeight);
@@ -170,10 +171,16 @@ namespace CharaSelect
 
             action.Invoke();
 
-            list.Select((s, i) => new { s.name, s.directory, index = i })
-                .ToList()
-                .ForEach((t) => CreateButton(t.name, t.directory, t.index));
+            var buttonList = list.Select((s, i) => new { s.name, s.directory, index = i })
+                .ToList();
 
+            buttonList.ForEach((t) => CreateButton(t.name, t.directory, t.index));
+
+            int columns = CharaSelectPlugin.Columns.Value;
+            int buttonHeight = CharaSelectPlugin.ButtonHeight.Value;
+            RectTransform rt = contentPane.transform.GetComponent<RectTransform>();
+            Vector2 sizeDelta = rt.sizeDelta;
+            rt.sizeDelta = new Vector2(rt.sizeDelta.x, (buttonHeight + 2*PADDING)*(buttonList.Count / columns)  );
         }
     }
 }

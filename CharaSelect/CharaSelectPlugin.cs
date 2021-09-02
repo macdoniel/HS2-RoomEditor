@@ -29,9 +29,9 @@ namespace CharaSelect
             Columns = Config.Bind("Appearance", "Columns", 2);
 
             var harmony = new Harmony("org.macdoniel.charaselect");
-            harmony.PatchAll();
 
             harmony.PatchAll(typeof(CharaSelect.PatchListUI));
+            harmony.PatchAll(typeof(CharaSelect.PatchHSceneUI));
 
             // harmony.PatchAll(typeof(CharaSelect.PatchCoordinateListUI));
             // harmony.PatchAll(typeof(CharaSelect.PatchHSceneCoords));

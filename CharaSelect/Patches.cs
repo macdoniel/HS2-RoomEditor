@@ -14,116 +14,201 @@ using Instructions = System.Collections.Generic.IEnumerable<HarmonyLib.CodeInstr
 
 namespace CharaSelect
 {
-    using CharaCustom;
-    class PatchListUI
+  using CharaCustom;
+  class PatchListUI
+  {
+
+    [HarmonyPostfix, HarmonyPatch(typeof(CustomClothesWindow), "Start")]
+    static void Start(CustomClothesWindow __instance)
     {
-
-        [HarmonyPostfix, HarmonyPatch(typeof(CustomClothesWindow), "Start")]
-        static void Start(CustomClothesWindow __instance)
-        {
-            Helpers.UI.ModifyGameMenu(__instance, "coordinate/female", () => 
-            {
-                Logger.Log("Action running!");
-                // TODO last parameter is false on load, true on save
-                __instance.UpdateWindow(true, 1, true);
-            });
-        }
-
-        [HarmonyPostfix, HarmonyPatch(typeof(CustomCharaWindow), "Start")]
-        static void StartChara(CustomCharaWindow __instance) 
-        {
-            Helpers.UI.ModifyGameMenu(__instance, "chara/female", () =>
-            {
-                Logger.Log("Chara Action running!!");
-                __instance.UpdateWindow(true, 1, true);
-            });
-        }
-
-        [HarmonyPrefix, HarmonyPatch(typeof(CustomClothesWindow), "UpdateWindow")]
-        static bool Prefix(CustomClothesWindow __instance, bool modeNew, int sex, bool save)
-        {
-            Type t = __instance.GetType();
-            FieldInfo info = t.GetField("lstClothes", BindingFlags.Instance | BindingFlags.NonPublic);
-			List<CustomClothesFileInfo> list = new List<CustomClothesFileInfo>();
-
-            CharaFolderUI plugin = __instance.gameObject.GetComponent<CharaFolderUI>();
-            string path = plugin.currentDir;
-            int num = 0;
-
-            Type atype = typeof(CustomClothesFileInfoAssist);
-            MethodInfo minfo = atype.GetMethod("AddList", BindingFlags.Static | BindingFlags.NonPublic);
-            Logger.Log("CharaSelect :: TRYING TO INVOKE STATIC METHOD! CLOTHES");
-            byte sexb = (byte)sex;
-            minfo.Invoke(null, new object[] { list, path, sexb, !save, num });
-
-            info.SetValue(__instance, list);
-            __instance.Sort();
-            return false;
-        }
-
-        [HarmonyPrefix, HarmonyPatch(typeof(CustomCharaWindow), "UpdateWindow")]
-        static bool PrefixChara(CustomCharaWindow __instance, bool modeNew, int sex, bool save)
-        {
-            Type t = __instance.GetType();
-            FieldInfo info = t.GetField("lstChara", BindingFlags.Instance | BindingFlags.NonPublic);
-			List<CustomCharaFileInfo> list = new List<CustomCharaFileInfo>();
-
-            CharaFolderUI plugin = __instance.gameObject.GetComponent<CharaFolderUI>();
-            string path = plugin.currentDir;
-
-            int num = 0;
-            Type atype = typeof(CustomCharaFileInfoAssist);
-            MethodInfo minfo = atype.GetMethod("AddList", BindingFlags.Static | BindingFlags.NonPublic);
-            Logger.Log("CharaSelect :: TRYING TO INVOKE STATIC METHOD! CHARA");
-            byte sexb = (byte)sex;
-            minfo.Invoke(null, new object[] { list, path, sexb, !save, true, true, false, num });
-
-            Logger.Log("CharaSelect :: Length of list is " + list.Count);
-
-            info.SetValue(__instance, list);
-            __instance.Sort();
-            return false;
-        }
-
-        [HarmonyTranspiler, HarmonyPatch(typeof(AIChara.ChaFileCoordinate), "SaveFile")]
-        static Instructions SaveCoordFileToDirectory(Instructions instructions)
-        {
-            string s = "call System.String System.IO.Path::GetFileName(System.String)";
-            return Helpers.Replace(instructions, s, (instruction) => {
-                return new List<CodeInstruction>{
-                    new CodeInstruction(OpCodes.Nop),
-                };
-            });
-        }
-
-        [HarmonyPrefix, HarmonyPatch(typeof(AIChara.ChaFileControl), "SaveCharaFile", new Type[] { typeof(string), typeof(byte), typeof(bool) })]
-        static bool PrefixFileSave(AIChara.ChaFileControl __instance, string filename, byte sex = 255, bool newFile = false)
-        {
-            // instead of a chara folder ui component, look for the save window (CvsO_CharaSave)
-            // get the folder ui component off that, and use the current dir to save the file.
-            CharaFolderUI[] controls = UnityEngine.MonoBehaviour.FindObjectsOfType<CharaFolderUI>();
-            if (controls.Length == 0)
-            {
-                Logger.Log("CharaSelect :: DID NOT FIND CHARA FOLDER UI COMPONENT!!!");
-               return true; 
-            }
-            else
-            {
-                Logger.Log("CharaSelect :: FOUND A CHARA FOLDER UI COMPONENT!!!");
-                return false;
-            }
-        }
+      Helpers.UI.ModifyGameMenu(__instance, "coordinate/female", () => 
+      {
+        Logger.Log("Action running!");
+        // TODO last parameter is false on load, true on save
+        __instance.UpdateWindow(true, 1, true);
+      });
     }
 
-    // class PatchHSceneCoords
+    [HarmonyPostfix, HarmonyPatch(typeof(CustomCharaWindow), "Start")]
+    static void StartChara(CustomCharaWindow __instance)
+    {
+      Helpers.UI.ModifyGameMenu(__instance, "chara/female", () =>
+      {
+        Logger.Log("Chara Action running!!");
+        __instance.UpdateWindow(true, 1, true);
+      });
+    }
+
+    [HarmonyPrefix, HarmonyPatch(typeof(CustomClothesWindow), "UpdateWindow")]
+    static bool Prefix(CustomClothesWindow __instance, bool modeNew, int sex, bool save)
+    {
+      Type t = __instance.GetType();
+      FieldInfo info = t.GetField("lstClothes", BindingFlags.Instance | BindingFlags.NonPublic);
+      List<CustomClothesFileInfo> list = new List<CustomClothesFileInfo>();
+
+      CharaFolderUI plugin = __instance.gameObject.GetComponent<CharaFolderUI>();
+      string path = plugin.currentDir;
+      int num = 0;
+      Type atype = typeof(CustomClothesFileInfoAssist);
+      MethodInfo minfo = atype.GetMethod("AddList", BindingFlags.Static | BindingFlags.NonPublic);
+
+      Logger.Log("CharaSelect :: TRYING TO INVOKE STATIC METHOD! CLOTHES");
+      byte sexb = (byte)sex;
+      minfo.Invoke(null, new object[] { list, path, sexb, !save, num });
+      info.SetValue(__instance, list);
+      __instance.Sort();
+      return false;
+    }
+
+    [HarmonyPrefix, HarmonyPatch(typeof(CustomCharaWindow), "UpdateWindow")]
+    static bool PrefixChara(CustomCharaWindow __instance, bool modeNew, int sex, bool save)
+    {
+      Type t = __instance.GetType();
+      FieldInfo info = t.GetField("lstChara", BindingFlags.Instance | BindingFlags.NonPublic);
+      List<CustomCharaFileInfo> list = new List<CustomCharaFileInfo>();
+      CharaFolderUI plugin = __instance.gameObject.GetComponent<CharaFolderUI>();
+      string path = plugin.currentDir;
+
+      int num = 0;
+      Type atype = typeof(CustomCharaFileInfoAssist);
+      MethodInfo minfo = atype.GetMethod("AddList", BindingFlags.Static | BindingFlags.NonPublic);
+      Logger.Log("CharaSelect :: TRYING TO INVOKE STATIC METHOD! CHARA");
+      byte sexb = (byte)sex;
+      minfo.Invoke(null, new object[] { list, path, sexb, !save, true, true, false, num });
+
+      Logger.Log("CharaSelect :: Length of list is " + list.Count);
+
+      info.SetValue(__instance, list);
+      __instance.Sort();
+      return false;
+    }
+
+    [HarmonyTranspiler, HarmonyPatch(typeof(AIChara.ChaFileCoordinate), "SaveFile")]
+    static Instructions SaveCoordFileToDirectory(Instructions instructions)
+    {
+      /** Ignore path trimming when saving coordinates */
+      string s = "call System.String System.IO.Path::GetFileName(System.String)";
+      return Helpers.Replace(instructions, s, (instruction) => {
+        return new List<CodeInstruction>{
+          new CodeInstruction(OpCodes.Nop),
+        };
+      });
+    }
+
+    [HarmonyPrefix, HarmonyPatch(typeof(AIChara.ChaFileControl), "SaveCharaFile", new Type[] { typeof(string), typeof(byte), typeof(bool) })]
+    static bool PrefixFileSave(AIChara.ChaFileControl __instance, ref string filename, byte sex = 255, bool newFile = false)
+    {
+      Object[] controls = UnityEngine.Resources.FindObjectsOfTypeAll(typeof(CvsO_CharaSave));
+      if (controls.Length == 0)
+      {
+        /** No UI component, proceed as normal */
+        return true; 
+      }
+      else
+      {
+        /** Found UI component, read the current directory and save there */
+        CharaFolderUI ui = ((CvsO_CharaSave)controls[0]).gameObject.GetComponent<CharaFolderUI>();
+        filename = ui.currentDir + "\\" + filename;
+        return true;
+      }
+    }
+  }
+
+  class PatchHSceneUI
+  {
+
+    [HarmonyPostfix, HarmonyPatch(typeof(HSceneSpriteCoordinatesCard), "Start")]
+    public static void Start(HSceneSpriteCoordinatesCard __instance)
+    {
+      var plugin = __instance.gameObject.GetOrAddComponent<HSceneFolderUI>();
+      plugin.Initialize(__instance);
+    }
+
+    public static List<CustomCharaFileInfo> InjectedChara(bool useMale, bool useFemale, bool useMyData = true, bool useDownload = true, bool usePreset = true, bool _isFindSaveData = true)
+    {
+      byte sex = useMale ? (byte)0 : (byte)1;
+      int num = 0;
+
+      var result = new List<CustomCharaFileInfo>();
+      var path = UserData.Path + ( useMale ?  "chara/male" : "chara/female" );
+      DirectoryInfo dir = new DirectoryInfo (path);
+      var info = dir.EnumerateDirectories (".", SearchOption.AllDirectories);
+      var iList = info.ToList();
+      iList.Add(dir);
+      var addInfo = typeof(CustomCharaFileInfoAssist).GetMethod("AddList", BindingFlags.NonPublic | BindingFlags.Static);
+
+      foreach (var directory in iList)
+      {
+        string name = directory.FullName;
+        string userPath = name.Substring(name.IndexOf("UserData") + "UserData".Length + 1);
+        string relativePath = UserData.Path + userPath;
+
+        addInfo.Invoke(null, new object[] {result, relativePath, sex, useMyData, useDownload, usePreset, _isFindSaveData, num});
+      }
+
+      return result;
+    }
+
+    public static List<CustomClothesFileInfo> Injected(bool useMale, bool useFemale, bool useMyData, bool usePreset)
+    {
+      byte sex = useMale ? (byte)0 : (byte)1;
+      int num = 0;
+
+      var result = new List<CustomClothesFileInfo>();
+      var path = UserData.Path + ( useMale ?  "coordinate/male" : "coordinate/female" );
+
+      DirectoryInfo dir = new DirectoryInfo (path);
+      var info = dir.EnumerateDirectories (".", SearchOption.AllDirectories);
+      var iList = info.ToList();
+      iList.Add(dir);
+
+      var addInfo = typeof(CustomClothesFileInfoAssist).GetMethod("AddList", BindingFlags.NonPublic | BindingFlags.Static);
+
+      foreach (var directory in iList)
+      {
+        string name = directory.FullName;
+        string userPath = name.Substring(name.IndexOf("UserData") + "UserData".Length + 1);
+        string relativePath = UserData.Path + userPath;
+
+        addInfo.Invoke(null, new object[] {result, relativePath, sex, usePreset, num});
+      }
+      return result;
+    }
+
+    [HarmonyTranspiler, HarmonyPatch(typeof(HSceneSpriteCoordinatesCard), "Init")]
+    static Instructions PatchHSceneCoordReplace(Instructions instructions)
+    {
+      return Helpers.Replace(instructions, "call System.Collections.Generic.List`1[[CharaCustom.CustomClothesFileInfo, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] CharaCustom.CustomClothesFileInfoAssist::CreateClothesFileInfoList(System.Boolean,System.Boolean,System.Boolean,System.Boolean)", (instruction) => {
+        return new List<CodeInstruction>() {
+          new CodeInstruction(OpCodes.Call, typeof(PatchHSceneUI).GetMethod(nameof(Injected), BindingFlags.Public | BindingFlags.Static))
+        };
+      });
+    }
+
+    [HarmonyTranspiler, HarmonyAfter(nameof(HS2_HCharaSwitcher)), HarmonyPatch(typeof(HS2_HCharaSwitcher.Tools), "PopulateList")]
+    static Instructions PatchHSceneCharaReplace(Instructions instructions)
+    {
+      Logger.Log("CharaSelect :: Patching :: ");
+      foreach (var item in instructions)
+      {
+        Logger.Log(item);
+      }
+      Logger.Log("CharaSelect :: Patched :: ");
+
+      return Helpers.Replace(instructions, "call System.Collections.Generic.List`1[[CharaCustom.CustomCharaFileInfo, Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]] CharaCustom.CustomCharaFileInfoAssist::CreateCharaFileInfoList(System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Boolean,System.Boolean)", (instruction) => {
+        return new List<CodeInstruction>() {
+          new CodeInstruction(OpCodes.Call, typeof(PatchHSceneUI).GetMethod(nameof(InjectedChara), BindingFlags.Public | BindingFlags.Static))
+        };
+      });
+    }
+
+    // [HarmonyTranspiler, HarmonyPatch(typeof(HSceneSprite), "Init")]
+    // static Instructions PatchHSceneCharaReplace(Instructions instructions)
     // {
 
-    //     [HarmonyPostfix, HarmonyPatch(typeof(HSceneSpriteCoordinatesCard), "Start")]
-    //     public static void Start(HSceneSpriteCoordinatesCard __instance)
-    //     {
-    //         var plugin = __instance.gameObject.GetOrAddComponent<HSceneFolderUI>();
-    //         plugin.Initialize(__instance);
-    //     }
+    //   return instructions;
+    // }
+  }
 
     //     [HarmonyPostfix, HarmonyPatch(typeof(HSceneSpriteCoordinatesCard), "ChangeTargetSex")]
     //     public static void Postfix(HSceneSpriteCoordinatesCard __instance, int sex)
@@ -133,7 +218,6 @@ namespace CharaSelect
     //         plugin.DeriveRootDir();
     //         plugin.FilterCoords(); 
     //     }
-    // }
 
 
     // [HarmonyPatch(typeof(HS2.GroupCharaSelectUI))]

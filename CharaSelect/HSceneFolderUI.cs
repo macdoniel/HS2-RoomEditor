@@ -61,15 +61,27 @@ namespace CharaSelect
             };
 
 
-            var nodes = coordCard.GetComponentsInChildren<HSceneSpriteCoordinatesNode>();
+            var fInfo = coordCard.GetType().GetField("lstCoordinates", BindingFlags.Instance | BindingFlags.NonPublic);
+            var lst = fInfo.GetValue(coordCard);
+            var lstCoordinates = (List<HSceneSpriteCoordinatesNode>)lst;
+
             String foundPath = null;
-            foreach (var node in nodes)
+
+            Logger.Log("CharaSelect :: number of found nodes: ");
+            Logger.Log(lstCoordinates.Count);
+
+            var nodes = coordCard.GetComponentsInChildren<HSceneSpriteCoordinatesNode>(true);
+            Logger.Log("CharaSelect :: number of found transform nodes: ");
+            Logger.Log(nodes.Length);
+
+
+            foreach (var node in lstCoordinates)
             {
                 var filename = node.fileName;
                 foreach (var root in possibleRoots)
                 {
                     Logger.Log(filename);
-                    if (filename.IndexOf(root) > 0)
+                    if (filename.Replace('\\', '/').IndexOf(root) > 0)
                     {
                         foundPath = root;
                         break;
@@ -135,7 +147,7 @@ namespace CharaSelect
 
             if (this._rootDir == null)
             {
-                DeriveRootDir();
+              return;
             }
 
             Logger.Log($"Current dir is : {this.currentDir}");
@@ -148,7 +160,7 @@ namespace CharaSelect
 
             var newList = lstCoordinates.Where((node) =>
             {
-                Logger.Log($"coordinate : {node.fileName}");
+                Logger.Log($"coordinate : {node.fileName} {node.coodeName}");
                 return currentFiles.Any((s) => s.Replace("\\","/").Equals(node.fileName.Replace("\\","/") ));
             }).ToList();
 
